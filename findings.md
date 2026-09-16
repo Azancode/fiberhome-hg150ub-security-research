@@ -1,0 +1,367 @@
+# Security Findings
+
+Formal documentation of security-relevant findings identified during authorized research against the FiberHome HG150-Ub VDSL2 modem/router.
+
+All testing was performed against a device controlled by the researcher in an isolated laboratory environment.
+
+---
+
+# Finding 1 — Unauthenticated Access to Wireless Configuration Interface
+
+**Severity:** To be determined
+
+**Status:** Confirmed observation
+
+**Affected Component:**
+
+
+/wlcfg.html
+
+
+## Summary
+
+The FiberHome HG150-Ub wireless configuration page was accessible without first completing the normal login process.
+
+The response contained wireless configuration information and a dynamically generated session key.
+
+This indicates that the web application exposes configuration-related information before a conventional authenticated session has been established.
+
+## Technical Details
+
+The wireless configuration page contains JavaScript variables representing the router's wireless state.
+
+Examples include:
+
+javascript
+var ssid = '...';
+var enbl = '1';
+var auth_mode = 'psk2';
+
+
+The page also contains a dynamically generated `sessionKey` value.
+
+Fresh requests to the page produced different session-key values.
+
+Examples observed during testing included:
+
+
+[REDACTED]
+[REDACTED]
+[REDACTED]
+
+
+Actual session-key values are intentionally omitted from this public repository.
+
+## Reproduction
+
+From the isolated laboratory network:
+
+
+GET /wlcfg.html HTTP/1.1
+Host: 192.168.10.1
+
+
+The response contained wireless configuration information despite the absence of a normal authenticated login.
+
+### Expected Behavior
+
+An unauthenticated user should receive an authentication/authorization response and should not receive protected configuration information.
+
+### Observed Behavior
+
+The server returned the wireless configuration page and associated configuration data.
+
+## Security Impact
+
+The direct impact demonstrated by this finding is **information exposure**.
+
+The exposed page also became relevant to the subsequent session-key investigation described in Finding 2.
+
+The full security impact should be evaluated separately rather than assuming that access to this page automatically provides unrestricted administrative access.
+
+---
+
+# Finding 2 — Fresh Session Key From Unauthenticated Configuration Page Accepted for Wireless Configuration Change
+
+**Severity:** To be determined
+
+**Status:** Confirmed in controlled laboratory testing
+
+**Affected Components:**
+
+
+/wlcfg.html
+/wlcfg.wl
+
+
+## Summary
+
+During analysis of the wireless configuration functionality, an unauthenticated request to `wlcfg.html` returned a dynamically generated session key.
+
+The wireless configuration JavaScript showed that requests to `wlcfg.wl` require:
+
+1. Wireless configuration parameters
+2. A calculated checksum
+3. A session key
+
+A stale session key was rejected by the backend.
+
+However, a freshly obtained session key from the unauthenticated configuration-page response was accepted by `wlcfg.wl` when the request checksum was correctly calculated.
+
+A controlled modification of the router's wireless SSID was successfully performed.
+
+## Technical Details
+
+The wireless configuration JavaScript constructs a request beginning with:
+
+
+/wlcfg.wl?
+
+
+The request contains parameters including:
+
+
+wlSsidIdx
+wlEnableHspot
+wlEnbl
+wlHide
+wlAPIsolation
+wlSsid
+wlCountry
+wlRegRev
+wlMaxAssoc
+wlDisableWme
+wlEnableWmf
+
+
+The request also contains:
+
+wlSyncNvram=1
+
+
+followed by a checksum:
+
+
+checksumKey=<calculated value>
+
+
+and a session key:
+
+
+sessionKey=<dynamic value>
+
+
+---
+
+## Checksum Mechanism
+
+The client-side JavaScript references:
+
+
+calcChecksumStr(loc)
+
+
+The function calculates the checksum by summing the character codes of the request string.
+
+Conceptually:
+
+
+checksum = sum(ord(character))
+
+
+The checksum is calculated before the `sessionKey` parameter is appended.
+
+For the controlled request using the test SSID:
+
+
+HACKED-BY-AZAN
+
+
+the calculated checksum was:
+
+
+52171
+
+
+---
+
+## Session-Key Behavior
+
+Several fresh requests to `wlcfg.html` generated different session-key values.
+
+Previously obtained/stale keys were tested against `wlcfg.wl`.
+
+A stale key produced:
+
+
+Invalid Session Key, please try again
+
+
+This indicates that the backend performs server-side validation of the supplied session key.
+
+The significant observation was that a **freshly generated key obtained from the unauthenticated configuration page** was accepted by the state-changing wireless configuration endpoint.
+
+---
+
+# Proof of Concept
+
+The following is a sanitized representation of the successful request.
+
+Sensitive session material is intentionally removed:
+
+http
+GET /wlcfg.wl?wlSsidIdx=0&wlEnableHspot=1&wlEnbl=1&wlHide=0&wlAPIsolation=0&wlSsid=HACKED-BY-AZAN&wlCountry=PK&wlRegRev=0&wlMaxAssoc=16&wlDisableWme=0&wlEnableWmf=1&wlSyncNvram=1&checksumKey=52171&sessionKey=[REDACTED] HTTP/1.1
+Host: 192.168.10.1
+Connection: close
+
+
+The actual request contained additional wireless/guest-network parameters generated by the router's JavaScript.
+
+---
+
+# Result
+
+The router accepted the request and initiated a wireless configuration restart.
+
+The response contained values indicating that the wireless subsystem was being restarted:
+
+javascript
+var wlRefresh = '1';
+var delayTime = 6;
+
+
+After allowing the wireless subsystem to restart, the wireless configuration page was requested again.
+
+The returned page contained:
+
+
+var ssid = 'HACKED-BY-AZAN'
+
+
+This confirmed that the SSID had actually been changed.
+
+---
+
+# Persistence
+
+The wireless configuration modification was subsequently verified to persist across a router reboot.
+
+This indicates that the modification was written to persistent router configuration rather than existing only as a temporary web-interface state.
+
+---
+
+# Security Impact
+
+The demonstrated impact is the ability to modify a wireless configuration setting through the web application's configuration endpoint using a session key obtained from an unauthenticated configuration-page response.
+
+The tested modification was:
+
+
+Wireless SSID
+
+
+The experiment does **not**, by itself, establish unrestricted administrative access or arbitrary configuration modification.
+
+Further testing is required to determine the complete security boundary of the observed behavior.
+
+---
+
+# Evidence
+
+Relevant evidence includes:
+
+* Nmap service enumeration
+* `login.html` JavaScript
+* `wlcfg.html` source
+* Wireless configuration JavaScript
+* Fresh session-key observations
+* Stale session-key rejection
+* Reconstructed `wlcfg.wl` request
+* Successful configuration response
+* Post-change verification
+* Persistence verification
+
+Sensitive HTTP captures and session tokens should remain private.
+
+---
+
+# Reproduction Conditions
+
+The experiment was performed under the following conditions:
+
+
+Target:
+FiberHome HG150-Ub
+
+Firmware:
+HG150-Ub_V3.0
+
+Target IP:
+192.168.10.1
+
+Test machine:
+Kali Linux
+
+Test IP:
+192.168.10.2
+
+Network:
+Isolated laboratory LAN
+
+
+The test was performed against hardware controlled by the researcher.
+
+---
+
+# Limitations
+
+The following points have not yet been conclusively established:
+
+* Whether the same session mechanism applies to every administrative endpoint.
+* Whether administrator credentials can be changed through the same mechanism.
+* Whether other configuration settings can be modified without authentication.
+* Whether the session key grants access to functionality beyond the tested wireless configuration endpoint.
+* Whether the observed behavior exactly corresponds to a previously documented vulnerability.
+* Whether firmware-level vulnerabilities exist independently of the web interface.
+
+These questions are reserved for further research.
+
+---
+
+# Remediation Considerations
+
+Potential defensive measures include:
+
+1. Require authentication and authorization before returning protected configuration pages.
+2. Generate session credentials only after successful authentication.
+3. Do not expose privileged session material to unauthenticated clients.
+4. Enforce authorization independently on every state-changing endpoint.
+5. Bind configuration operations to an authenticated user/session.
+6. Avoid relying on client-side JavaScript redirects as an access-control mechanism.
+7. Review all CGI/configuration endpoints for equivalent authorization weaknesses.
+
+---
+
+# Related Research
+
+This finding is part of a larger investigation into the router's web application.
+
+See:
+
+* [`research-notes.md`](research-notes.md)
+* [`README.md`](README.md)
+
+Future research will examine the router firmware and backend implementation to determine how the observed session and configuration mechanisms are implemented.
+
+---
+
+# Research Status
+
+| Finding                                               | Status                     |
+| ----------------------------------------------------- | -------------------------- |
+| Unauthenticated wireless configuration exposure       | Confirmed                  |
+| Fresh session key accepted for wireless configuration | Confirmed                  |
+| Persistent SSID modification                          | Confirmed                  |
+| Unrestricted administrative access                    | Not established            |
+| Administrator password modification                   | Not tested                 |
+| Firmware-level vulnerability                          | Under future investigation |
