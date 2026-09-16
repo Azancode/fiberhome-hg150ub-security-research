@@ -260,7 +260,7 @@ The checksum was calculated over the request string before the `sessionKey` para
 For the controlled SSID-change request using:
 
 
-HACKED-BY-AZAN
+HACKED-BY-AZAN1
 
 
 the independently calculated checksum was:
@@ -307,7 +307,7 @@ The reconstructed request was then submitted against the isolated laboratory rou
 
 The wireless SSID was changed to:
 
-HACKED-BY-AZAN
+HACKED-BY-AZAN1
 
 
 The router returned a response indicating that the wireless subsystem would restart.
@@ -331,7 +331,7 @@ After allowing the wireless subsystem time to restart, the wireless configuratio
 The returned JavaScript contained:
 
 javascript
-var ssid = 'HACKED-BY-AZAN'
+var ssid = 'HACKED-BY-AZAN1'
 
 
 This independently confirmed that the SSID had been modified on the router.
